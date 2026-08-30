@@ -1,0 +1,29 @@
+# Apps Script local metadata
+.clasp.json
+.claspignore
+
+# Credentials / secrets
+.env
+.env.*
+credentials.json
+token.json
+client_secret*.json
+*.pem
+*.key
+
+# Private exports / job-search data
+*.xlsx
+*.csv
+exports/
+private/
+backups/
+
+# Logs
+*.log
+logs/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
