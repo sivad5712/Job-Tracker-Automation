@@ -10,14 +10,20 @@ A Google Apps Script automation that turns Gmail job-search activity into a stru
 
 ## Demo & documentation
 
-- **Video walkthrough script:** [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
-- **Audio project breakdown:** [`docs/AUDIO_SCRIPT.md`](docs/AUDIO_SCRIPT.md)
-- **Complete setup guide:** [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md)
+[![Watch the 60-second animated Gmail Job Tracker demo](assets/demo-poster.png)](assets/job-tracker-animated-demo.mp4)
+
+- **Animated project demo (60 seconds):** [`assets/job-tracker-animated-demo.mp4`](assets/job-tracker-animated-demo.mp4)
+- **Professional project guide (PDF):** [`docs/Gmail_Job_Tracker_Professional_Guide.pdf`](docs/Gmail_Job_Tracker_Professional_Guide.pdf)
+- **Complete A-to-Z setup guide:** [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md)
 - **Architecture:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - **Status logic:** [`docs/STATUS_LOGIC.md`](docs/STATUS_LOGIC.md)
 - **Historical backfill:** [`docs/HISTORICAL_BACKFILL.md`](docs/HISTORICAL_BACKFILL.md)
 - **Testing:** [`docs/TESTING.md`](docs/TESTING.md)
 - **Troubleshooting:** [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
+- **Optional live screen-recording script:** [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
+- **Optional audio presentation script:** [`docs/AUDIO_SCRIPT.md`](docs/AUDIO_SCRIPT.md)
+
+The animated demo and PDF use synthetic examples so the repository can explain the system without exposing a real Gmail inbox, recruiter information, application IDs, or private Google Sheet identifiers.
 
 > The public repository contains no personal Gmail data, recruiter records, OAuth credentials, or private Google Sheet IDs.
 
@@ -303,16 +309,17 @@ See [`SECURITY.md`](SECURITY.md).
 
 ## Quick start
 
-1. Create the Google Sheet template described in [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
-2. Create a standalone Google Apps Script project.
-3. Add every `.gs` file from [`src/`](src/) to that same Apps Script project.
-4. Replace `YOUR_GOOGLE_SHEET_ID_HERE` in your **private** copy with the tracker spreadsheet ID.
-5. Authorize Gmail and Google Sheets access.
-6. Run `testSpreadsheetConnection()`.
-7. Run the live sync tests described in [`docs/TESTING.md`](docs/TESTING.md).
-8. Create the `All Jobs` sheet and Dashboard.
-9. Add a time-driven trigger for `runJobTrackerAutomation()`.
-10. Run historical backfills only when intentionally reconstructing older Gmail activity.
+1. Read the professional PDF overview: [`docs/Gmail_Job_Tracker_Professional_Guide.pdf`](docs/Gmail_Job_Tracker_Professional_Guide.pdf).
+2. Create the Google Sheet template described in [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
+3. Create a standalone Google Apps Script project.
+4. Add every `.gs` file from [`src/`](src/) to that same Apps Script project.
+5. Replace `YOUR_GOOGLE_SHEET_ID_HERE` in your **private** copy with the tracker spreadsheet ID.
+6. Authorize Gmail and Google Sheets access.
+7. Run `testSpreadsheetConnection()`.
+8. Run the live sync tests described in [`docs/TESTING.md`](docs/TESTING.md).
+9. Create the `All Jobs` sheet and Dashboard.
+10. Add a time-driven trigger for `runJobTrackerAutomation()`.
+11. Run historical backfills only when intentionally reconstructing older Gmail activity.
 
 Apps Script loads all `.gs` files in one project into a shared global namespace. The numbered files in `src/` preserve the original source order for readability.
 
@@ -351,6 +358,8 @@ Job-Tracker-Automation/
 │   ├── ...
 │   └── 25-refresh-job-dashboard.gs
 ├── docs/
+│   ├── README.md
+│   ├── Gmail_Job_Tracker_Professional_Guide.pdf
 │   ├── SETUP_GUIDE.md
 │   ├── ARCHITECTURE.md
 │   ├── STATUS_LOGIC.md
@@ -362,6 +371,8 @@ Job-Tracker-Automation/
 ├── examples/
 │   └── sample-sheet-layout.md
 └── assets/
+    ├── demo-poster.png
+    ├── job-tracker-animated-demo.mp4
     └── README.md
 ```
 
