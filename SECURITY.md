@@ -18,7 +18,7 @@ Never commit:
 
 ## Public source configuration
 
-`Code.gs` uses the placeholder:
+The first module in `src/` uses the placeholder:
 
 ```javascript
 const SPREADSHEET_ID = 'YOUR_GOOGLE_SHEET_ID_HERE';
@@ -31,6 +31,8 @@ For a more advanced deployment, store the ID in Apps Script Script Properties an
 ## Gmail behavior
 
 The tracker reads Gmail information required for classification and creates Gmail thread links in the spreadsheet. The published code should be reviewed before authorization, and users should grant only the permissions needed for their deployment.
+
+The project is a tracker; it does not require deleting Gmail messages or automatically sending messages.
 
 ## Demo safety
 
