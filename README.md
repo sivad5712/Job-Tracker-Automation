@@ -1,21 +1,25 @@
-# Gmail Job Tracker - Automated Recruiter & Application Tracking
+# Gmail Job Tracker — Automated Recruiter & Application Tracking
 
-A Google Apps Script automation that turns Gmail job-search activity into a structured Google Sheets tracking system. It tracks recruiter/vendor outreach, direct job applications, recruiter stages, application statuses, historical activity, daily sheets, a permanent `All Jobs` view, and a dashboard.
+A Google Apps Script automation that turns Gmail job-search activity into a structured Google Sheets tracking system. It tracks recruiter/vendor outreach, direct job applications, recruiter stages, application statuses, historical activity, daily sheets, a permanent `All Jobs` master view, and a dashboard.
 
-> **The problem:** During an active job search, recruiter emails, application confirmations, RTRs, submissions, assessments, interviews, rejections, and offers are spread across Gmail and become difficult to track manually.
+> **The problem:** During an active job search, recruiter conversations, application confirmations, RTR requests, submissions, assessments, interviews, rejections, and offers are spread across Gmail and become difficult to maintain manually in a spreadsheet.
 >
-> **The fix:** This project scans Gmail on a schedule, classifies job-search messages, writes structured records into Google Sheets, updates statuses from later replies, prevents duplicate processing, and can reconstruct historical activity in batches.
+> **The fix:** This project scans Gmail on a schedule, classifies job-search messages, writes structured records into Google Sheets, updates existing rows from later status emails, prevents duplicate processing, and can reconstruct historical Gmail activity in batches.
 
 ---
 
-## Demo
+## Demo & documentation
 
-- **Video walkthrough:** Record using [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
-- **Audio breakdown:** Record using [`docs/AUDIO_SCRIPT.md`](docs/AUDIO_SCRIPT.md)
-- **Setup guide:** [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md)
-- **Printable PDF guide:** [`docs/Gmail_Job_Tracker_Setup_Guide.pdf`](docs/Gmail_Job_Tracker_Setup_Guide.pdf)
+- **Video walkthrough script:** [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
+- **Audio project breakdown:** [`docs/AUDIO_SCRIPT.md`](docs/AUDIO_SCRIPT.md)
+- **Complete setup guide:** [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md)
+- **Architecture:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- **Status logic:** [`docs/STATUS_LOGIC.md`](docs/STATUS_LOGIC.md)
+- **Historical backfill:** [`docs/HISTORICAL_BACKFILL.md`](docs/HISTORICAL_BACKFILL.md)
+- **Testing:** [`docs/TESTING.md`](docs/TESTING.md)
+- **Troubleshooting:** [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
 
-> The repository contains no personal Gmail data, recruiter records, OAuth credentials, or private Google Sheet IDs.
+> The public repository contains no personal Gmail data, recruiter records, OAuth credentials, or private Google Sheet IDs.
 
 ---
 
@@ -23,39 +27,50 @@ A Google Apps Script automation that turns Gmail job-search activity into a stru
 
 ```mermaid
 flowchart LR
-    A[Gmail] --> B[Google Apps Script]
-    T[Hourly Time Trigger] --> B
-    B --> C[Daily YYYY-MM-DD Sheet]
-    B --> D[All Jobs]
-    B --> E[Dashboard]
-    B --> F[_Processed]
-    H[Historical Gmail Backfill] --> D
-    F --> B
+    Gmail[Gmail] --> Engine[Google Apps Script]
+    Trigger[Hourly Time Trigger] --> Engine
+    Engine --> Daily[Daily YYYY-MM-DD Sheet]
+    Engine --> Master[All Jobs]
+    Engine --> Dashboard[Dashboard]
+    Engine --> Processed[_Processed]
+    History[Historical Gmail Backfill] --> Master
+    Processed --> Engine
 ```
 
-### Live flow
-
-1. A time-driven trigger runs `runJobTrackerAutomation()`.
-2. Sent mail is checked for recruiter/vendor communication.
-3. Incoming mail is checked for direct job applications and ATS confirmations.
-4. Recruiter and portal status messages are detected.
-5. Daily sheets are updated.
-6. `All Jobs` is kept in sync for long-term history.
-7. `_Processed` stores message-level processing state to prevent duplicate work.
-8. The Dashboard is refreshed.
-
-### Historical flow
-
-Historical Gmail is processed in small batches so a large mailbox can be scanned without relying on one long Apps Script execution.
+### Live workflow
 
 ```text
+Hourly trigger
+     ↓
+runJobTrackerAutomation()
+     ↓
+Recruiter sent-email sync
+     ↓
+Recruiter status sync
+     ↓
+Portal/direct application sync
+     ↓
+Application status sync
+     ↓
+Dashboard refresh
+```
+
+### Historical workflow
+
+```text
+Historical Gmail
+     ↓
+Batched processing + saved position
+     ↓
 Recruiter history
-      ->
+     ↓
 Portal application history
-      ->
+     ↓
 Portal status history
-      ->
+     ↓
 Recruiter status history
+     ↓
+All Jobs
 ```
 
 ---
@@ -67,29 +82,29 @@ Recruiter status history
 - Recruiter name, company, email, phone, and job-title extraction
 - Sent vs. follow-up detection
 - Direct application and ATS confirmation detection
-- Portal identification for common job boards and applicant tracking systems
+- Portal detection for common job boards and applicant tracking systems
 - Company and position extraction from application emails
-- Recruiter status tracking: Sent, Follow-up Sent, Replied, RTR, Submitted, Assessment, Interview, Rejected, Offer, Closed
-- Portal status tracking: Applied, Assessment, Interview, Rejected, Offer, Withdrawn
-- Thread-aware matching to reduce incorrect status updates
-- Status-progression safeguards to avoid moving records backward incorrectly
-- Message-ID duplicate prevention
+- Recruiter status tracking
+- Portal application status tracking
+- Thread-aware row matching
+- Status-progression safeguards
+- Gmail Message ID duplicate prevention
 - Permanent `All Jobs` master sheet
-- Batched historical Gmail backfill
+- Batched historical Gmail backfills
 - Hidden `_Processed` state sheet
 - Google Sheets Dashboard
-- Gmail deep links back to the source thread
-- Apps Script locking to reduce overlapping runs
+- Gmail deep links to source threads
+- `LockService` protection against overlapping automation runs
 
 ---
 
-## Google Sheets layout
+## Google Sheets design
 
 ```text
 TEMPLATE
-  |-- RECRUITER / VENDOR EMAILS SENT
-  |-- 4 blank rows
-  `-- PORTAL / DIRECT JOB APPLICATIONS
+  ├── RECRUITER / VENDOR EMAILS SENT
+  ├── exactly 4 blank rows
+  └── PORTAL / DIRECT JOB APPLICATIONS
 
 YYYY-MM-DD
 YYYY-MM-DD
@@ -110,37 +125,81 @@ _Processed  (hidden)
 | Date | Portal | Company | Position | Application # | Status | Email Link |
 |---|---|---|---|---|---|---|
 
+A sanitized example is available in [`examples/sample-sheet-layout.md`](examples/sample-sheet-layout.md).
+
 ---
 
-## Status logic
+## Recruiter status engine
 
-### Recruiter / Vendor
-
-```text
-Sent -> Follow-up Sent -> Replied -> RTR -> Submitted -> Assessment -> Interview -> Offer
-```
-
-Possible terminal outcomes include `Rejected`, `Closed`, and `Offer`.
-
-The automation uses progression rules so a later low-stage message does not normally overwrite a more advanced stage. For example, an Interview should not be replaced by Replied just because a generic reply arrives later.
-
-### Portal / Direct Applications
+Supported statuses:
 
 ```text
-Applied -> Assessment -> Interview -> Offer
+Sent
+Follow-up Sent
+Replied
+RTR
+Submitted
+Assessment
+Interview
+Rejected
+Offer
+Closed
 ```
 
-Possible terminal outcomes include `Rejected`, `Withdrawn`, and `Offer`.
+Typical active progression:
 
-See [`docs/STATUS_LOGIC.md`](docs/STATUS_LOGIC.md) for the matching and progression rules.
+```text
+Sent → Follow-up Sent → Replied → RTR → Submitted → Assessment → Interview → Offer
+```
+
+The tracker prevents lower-stage messages from normally moving an advanced record backward. Terminal outcomes such as `Rejected`, `Closed`, and `Offer` receive special handling.
+
+---
+
+## Portal application status engine
+
+Supported statuses:
+
+```text
+Applied
+Assessment
+Interview
+Rejected
+Offer
+Withdrawn
+```
+
+Typical active progression:
+
+```text
+Applied → Assessment → Interview → Offer
+```
+
+Later status emails update the existing application row instead of creating a new application record when a reliable match is found.
+
+---
+
+## Matching strategy
+
+A status email is not matched only by sender. The automation combines stronger and weaker evidence such as:
+
+- Same Gmail thread
+- Exact recruiter email
+- Company text
+- Job title or position text
+- Sender display/domain context
+
+For recruiter records, the same Gmail thread receives very strong preference. Fallback recruiter matching requires the recruiter email together with job/company evidence. Ambiguous ties can be rejected instead of guessed.
+
+See [`docs/STATUS_LOGIC.md`](docs/STATUS_LOGIC.md).
 
 ---
 
 ## Duplicate prevention
 
-A hidden `_Processed` sheet records the Gmail message ID together with the workflow type. This makes repeated trigger executions idempotent for the same workflow.
+A hidden `_Processed` sheet records a workflow type together with the Gmail Message ID. This makes scheduled runs idempotent for the same workflow.
 
-Example workflow keys:
+Example processing keys:
 
 ```text
 RECRUITER
@@ -157,16 +216,49 @@ ALL_PORTAL_STATUS
 
 ## Historical backfill
 
-Large mailboxes cannot safely be processed in one Apps Script run. The historical import therefore uses Script Properties to save a Gmail search position and temporary time-driven triggers to continue processing later.
+Large Gmail accounts cannot safely be reconstructed in one Apps Script execution. Historical workflows therefore use:
 
-Current batch-oriented workflows include:
+- Batch sizes
+- Script Properties for saved Gmail positions
+- Temporary time-driven triggers
+- Message-ID duplicate tracking
+- `LockService`
 
-- Historical recruiter/vendor backfill
-- Historical portal/application backfill
-- Historical portal status backfill
-- Historical recruiter status backfill
+The current implementation uses Gmail search offsets. This works for staged imports but mailbox ordering can change during a long-running import; a date/cursor strategy plus a final verification pass is a planned improvement.
 
 See [`docs/HISTORICAL_BACKFILL.md`](docs/HISTORICAL_BACKFILL.md).
+
+---
+
+## Dashboard
+
+The Dashboard summarizes:
+
+**Today**
+- Recruiter/vendor emails
+- Applications
+
+**Recruiter / Vendor summary**
+- Total recruiter emails
+- Sent
+- Follow-up Sent
+- Replied
+- RTR
+- Submitted
+- Assessment
+- Interview
+- Rejected
+- Offer
+- Closed
+
+**Portal / Direct Application summary**
+- Total applications
+- Applied
+- Assessment
+- Interview
+- Rejected
+- Offer
+- Withdrawn
 
 ---
 
@@ -174,27 +266,36 @@ See [`docs/HISTORICAL_BACKFILL.md`](docs/HISTORICAL_BACKFILL.md).
 
 | Layer | Technology |
 |---|---|
-| Language | JavaScript (Google Apps Script V8) |
+| Language | JavaScript / Google Apps Script V8 |
 | Automation | Google Apps Script |
-| Email source | Gmail / `GmailApp` |
+| Email | Gmail / `GmailApp` |
 | Storage | Google Sheets |
 | Scheduling | Apps Script time-driven triggers |
 | State | Script Properties + `_Processed` sheet |
-| Concurrency control | `LockService` |
+| Concurrency | `LockService` |
 | Dashboard | Google Sheets |
 | Source control | GitHub |
 
 ---
 
-## Security and privacy
+## Security & privacy
 
-This repository is designed to contain **code only**, not private job-search data.
+The public source is sanitized. The first source module contains:
 
-- Do not commit your real Google Sheet ID.
-- Do not commit Gmail exports, recruiter lists, application data, or screenshots containing personal information.
-- Do not commit OAuth credentials, client secrets, tokens, API keys, `.clasp.json`, or environment files.
-- The project does not require deleting Gmail messages.
-- Test screenshots and demo recordings should use synthetic data.
+```javascript
+const SPREADSHEET_ID = 'YOUR_GOOGLE_SHEET_ID_HERE';
+```
+
+Replace that placeholder only in your private Apps Script deployment.
+
+Never commit:
+
+- Real Google Sheet IDs
+- Gmail exports or copied private email content
+- Recruiter email addresses or phone numbers from real activity
+- OAuth tokens or client secrets
+- `.clasp.json` from a private Apps Script project
+- Screenshots exposing real application or account data
 
 See [`SECURITY.md`](SECURITY.md).
 
@@ -202,17 +303,18 @@ See [`SECURITY.md`](SECURITY.md).
 
 ## Quick start
 
-1. Create a Google Sheet with a `TEMPLATE` tab.
-2. Add the recruiter and portal sections documented in [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
-3. Create a standalone Google Apps Script project.
-4. Copy `Code.gs` into the project.
-5. Replace `YOUR_GOOGLE_SHEET_ID_HERE` in your private Apps Script copy with your Sheet ID, or move it to Script Properties before deployment.
-6. Authorize the project to use Gmail and Google Sheets.
-7. Run the setup/test functions from the guide.
-8. Create a time-driven trigger for `runJobTrackerAutomation`.
-9. Run historical backfills only when you intentionally want to reconstruct past Gmail activity.
+1. Create the Google Sheet template described in [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
+2. Create a standalone Google Apps Script project.
+3. Add every `.gs` file from [`src/`](src/) to that same Apps Script project.
+4. Replace `YOUR_GOOGLE_SHEET_ID_HERE` in your **private** copy with the tracker spreadsheet ID.
+5. Authorize Gmail and Google Sheets access.
+6. Run `testSpreadsheetConnection()`.
+7. Run the live sync tests described in [`docs/TESTING.md`](docs/TESTING.md).
+8. Create the `All Jobs` sheet and Dashboard.
+9. Add a time-driven trigger for `runJobTrackerAutomation()`.
+10. Run historical backfills only when intentionally reconstructing older Gmail activity.
 
-For the complete procedure, use [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
+Apps Script loads all `.gs` files in one project into a shared global namespace. The numbered files in `src/` preserve the original source order for readability.
 
 ---
 
@@ -220,84 +322,70 @@ For the complete procedure, use [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
 
 | Function | Purpose |
 |---|---|
-| `createTodaySheet()` | Creates today's tracker tab from `TEMPLATE` |
-| `syncRecruiterSentEmailsToSheet()` | Tracks outgoing recruiter/vendor messages |
+| `createTodaySheet()` | Creates today's sheet from `TEMPLATE` |
+| `syncRecruiterSentEmailsToSheet()` | Tracks outgoing recruiter/vendor activity |
 | `syncPortalApplicationsToSheet()` | Tracks direct/portal applications |
 | `syncRecruiterStatuses()` | Updates recruiter/vendor stages |
 | `syncApplicationStatuses()` | Updates portal application stages |
-| `runJobTrackerAutomation()` | Runs the normal live tracking workflow |
+| `runJobTrackerAutomation()` | Runs the normal live workflow |
 | `createAllJobsSheet()` | Creates the permanent master sheet |
-| `refreshJobDashboard()` | Rebuilds dashboard summary counts |
-| `checkAllJobsBackfillProgress()` | Logs historical backfill progress |
+| `refreshJobDashboard()` | Rebuilds Dashboard counts |
+| `checkAllJobsBackfillProgress()` | Logs historical-import progress |
+
+---
+
+## Repository structure
+
+```text
+Job-Tracker-Automation/
+├── README.md
+├── appsscript.json
+├── .gitignore
+├── LICENSE
+├── CHANGELOG.md
+├── SECURITY.md
+├── CONTRIBUTING.md
+├── src/
+│   ├── README.md
+│   ├── 01-test-spreadsheet-connection.gs
+│   ├── ...
+│   └── 25-refresh-job-dashboard.gs
+├── docs/
+│   ├── SETUP_GUIDE.md
+│   ├── ARCHITECTURE.md
+│   ├── STATUS_LOGIC.md
+│   ├── HISTORICAL_BACKFILL.md
+│   ├── TESTING.md
+│   ├── TROUBLESHOOTING.md
+│   ├── DEMO_SCRIPT.md
+│   └── AUDIO_SCRIPT.md
+├── examples/
+│   └── sample-sheet-layout.md
+└── assets/
+    └── README.md
+```
 
 ---
 
 ## Testing
 
-The source includes targeted test helpers for spreadsheet connectivity, sent-email scanning, recruiter detection, and portal application detection. Use synthetic emails during testing.
+The project includes test helpers for spreadsheet connectivity, daily sheet creation, sent-email scanning, recruiter detection, application detection, duplicate handling, status progression, and the master automation.
 
-See [`docs/TESTING.md`](docs/TESTING.md).
-
----
-
-## Troubleshooting
-
-Common issues covered in [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md):
-
-- Daily sheet not created
-- Duplicate rows
-- Recruiter email not detected
-- Application not detected
-- Wrong company or job title
-- Status did not update
-- Historical backfill appears stuck
-- Trigger does not run
-- Dashboard shows zero values
-- Apps Script execution limits
+Use synthetic messages before testing against a production mailbox. See [`docs/TESTING.md`](docs/TESTING.md).
 
 ---
 
-## What I would build next
+## What I'd build next
 
-- Replace offset-based historical scanning with a date/cursor strategy that is less sensitive to mailbox ordering changes
-- Add a single incremental Gmail cursor for faster live runs
-- Add automated tests for classification and extraction functions
-- Add configurable keywords and ATS rules
-- Add normalized company/job-title dictionaries
-- Add weekly conversion analytics
-- Add interview-to-offer funnel metrics
-- Add a setup wizard for Script Properties and triggers
+- Replace offset-based historical pagination with date/cursor-based scanning
+- Use one incremental Gmail cursor for faster live runs
+- Add automated unit tests for pure classification/extraction functions
+- Add configurable keyword and ATS rules
+- Normalize company and job-title variants
+- Add weekly funnel and conversion analytics
+- Add interview-to-offer metrics
+- Add a setup wizard for properties and triggers
 - Add a multi-user deployment model
-
----
-
-## Repository contents
-
-```text
-Job-Tracker-Automation/
-|-- Code.gs
-|-- appsscript.json
-|-- README.md
-|-- .gitignore
-|-- LICENSE
-|-- CHANGELOG.md
-|-- SECURITY.md
-|-- CONTRIBUTING.md
-|-- docs/
-|   |-- SETUP_GUIDE.md
-|   |-- Gmail_Job_Tracker_Setup_Guide.pdf
-|   |-- ARCHITECTURE.md
-|   |-- STATUS_LOGIC.md
-|   |-- HISTORICAL_BACKFILL.md
-|   |-- TESTING.md
-|   |-- TROUBLESHOOTING.md
-|   |-- DEMO_SCRIPT.md
-|   `-- AUDIO_SCRIPT.md
-|-- examples/
-|   `-- sample-sheet-layout.md
-`-- assets/
-    `-- README.md
-```
 
 ---
 
@@ -310,3 +398,7 @@ Job-Tracker-Automation/
 ## License
 
 MIT License. See [`LICENSE`](LICENSE).
+
+## Author
+
+Siva Sankeerth Damineni
